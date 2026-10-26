@@ -19,7 +19,18 @@ function chime() {
 
 export const Route = createFileRoute("/desk")({
   head: () => ({
-    meta: [{ title: "Desk — Aurelstone" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Desk — Aurelstone" },
+      { name: "robots", content: "noindex" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Desk" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+    ],
+    links: [
+      { rel: "manifest", href: "/desk.webmanifest" },
+      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
+    ],
   }),
   component: DeskPage,
 });
@@ -48,7 +59,7 @@ function DeskPage() {
   const primed = useRef(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(KEY_NAME);
+    const saved = localStorage.getItem(KEY_NAME);
     if (saved) {
       setKey(saved);
       setReady(true);
@@ -109,7 +120,7 @@ function DeskPage() {
           className="mt-8 flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            sessionStorage.setItem(KEY_NAME, key);
+            localStorage.setItem(KEY_NAME, key);
             setReady(true);
           }}
         >

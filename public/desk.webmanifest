@@ -1,0 +1,18 @@
+{
+  "name": "Aurelstone Desk",
+  "short_name": "Desk",
+  "description": "Aurelstone showroom desk",
+  "start_url": "/desk",
+  "scope": "/desk",
+  "display": "standalone",
+  "background_color": "#f4efe8",
+  "theme_color": "#1c1917",
+  "icons": [
+    {
+      "src": "/__grok/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
