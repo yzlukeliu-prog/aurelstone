@@ -1,0 +1,5 @@
+- Do not open the website preview or sidebar unless the user explicitly asks. [2026-10-01]
+- Domain aurelstone.com.au is ACTIVE at VentraIP, auto-renew on. [2026-10-21]
+- Showroom desk chat is on the site. Visitors use the Ask button. Staff reply at /desk with key aurelstone. Visitor English is shown with Chinese underneath; staff Chinese is translated to English for the visitor. Staff replies are learned; later similar questions are answered in the staff's wording. Sample, visit, and quote forms also land on the desk, with a chime and browser notification. [2026-10-22]
+- Style library is at /styles. Built from the Quark share taxonomy (35 styles, 18 spaces) but uses Aurelstone's own 12 styles and existing showroom images. The share itself is 100881 files / 97.8G and was not downloaded. [2026-10-26]
+- Purchased Quark library is a style reference for generating original site images, not for publishing. Learned notes are in data/style-notes.md. [2026-10-26]
