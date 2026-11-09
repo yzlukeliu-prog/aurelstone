@@ -37,8 +37,10 @@ async function notifyPhones(thread, text) {
     await Promise.all(
       subs.map(async (sub) => {
         try {
-          await webpush.sendNotification(sub, payload);
+          const res = await webpush.sendNotification(sub, payload);
+          console.log("desk push", res.statusCode, String(sub.endpoint).slice(0, 48));
         } catch (err) {
+          console.log("desk push failed", err?.statusCode || 0, err?.body || err?.message);
           if (err?.statusCode === 404 || err?.statusCode === 410) {
             await dropSubscription(sub.endpoint);
           }
@@ -149,6 +151,37 @@ export default defineHandler(async (event) => {
     const body = await event.req.json().catch(() => ({}));
     await saveSubscription(body.subscription);
     return { ok: true };
+  }
+  if (path === "/api/desk/test-push" && method === "POST") {
+    if (!pushReady()) return { ok: false, reason: "push keys missing" };
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:desk@aurelstone.com.au",
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY,
+    );
+    const subs = await listSubscriptions();
+    const payload = JSON.stringify({
+      title: "Aurelstone desk",
+      body: "通知测试。如果看到这条，手机通知已经通了。",
+    });
+    const results = [];
+    for (const sub of subs) {
+      try {
+        const res = await webpush.sendNotification(sub, payload);
+        results.push({ ok: true, status: res.statusCode, endpoint: String(sub.endpoint).slice(0, 48) });
+      } catch (err) {
+        results.push({
+          ok: false,
+          status: err?.statusCode || 0,
+          endpoint: String(sub.endpoint || "").slice(0, 48),
+          error: err?.body || err?.message || "send failed",
+        });
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
+          await dropSubscription(sub.endpoint);
+        }
+      }
+    }
+    return { count: subs.length, results };
   }
   event.res.status = 404;
   return { error: "not found" };
