@@ -1,5 +1,5 @@
 import { defineHandler } from "nitro";
-import webpush from "web-push";
+import * as webpush from "web-push";
 import {
   dropSubscription,
   findLearned,
