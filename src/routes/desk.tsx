@@ -45,11 +45,24 @@ type Thread = {
 };
 
 const KEY_NAME = "aurelstone-desk-key";
-const DESK_KEY = "aurelstone";
+
+function readSavedKey() {
+  try {
+    const stored = localStorage.getItem(KEY_NAME);
+    if (stored) return stored;
+  } catch { /* private mode */ }
+  const match = document.cookie.match(/(?:^|; )aurelstone-desk-key=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function rememberKey(value: string) {
+  try { localStorage.setItem(KEY_NAME, value); } catch { /* ignore */ }
+  document.cookie = `aurelstone-desk-key=${encodeURIComponent(value)}; Max-Age=31536000; Path=/; SameSite=Lax`;
+}
 
 function DeskPage() {
-  const [key, setKey] = useState(DESK_KEY);
-  const [ready, setReady] = useState(true);
+  const [key, setKey] = useState("");
+  const [ready, setReady] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [learned, setLearned] = useState<{ question: string; answer: string }[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -60,7 +73,11 @@ function DeskPage() {
   const primed = useRef(false);
 
   useEffect(() => {
-    localStorage.setItem(KEY_NAME, DESK_KEY);
+    const saved = readSavedKey();
+    if (saved) {
+      setKey(saved);
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -117,7 +134,7 @@ function DeskPage() {
           className="mt-8 flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            localStorage.setItem(KEY_NAME, key);
+            rememberKey(key);
             setReady(true);
           }}
         >
