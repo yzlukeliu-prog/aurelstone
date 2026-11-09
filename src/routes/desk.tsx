@@ -82,6 +82,26 @@ function DeskPage() {
   }, []);
 
   useEffect(() => {
+    if (!ready || Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+    const enable = async () => {
+      const reg = await navigator.serviceWorker.register("/desk-sw.js");
+      const keyRes = await fetch("/api/desk/push-key");
+      const { key: publicKey } = await keyRes.json();
+      if (!publicKey) return;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: publicKey,
+      });
+      await fetch("/api/desk/subscribe", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-desk-key": key },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+    };
+    void enable().catch(() => {});
+  }, [ready, key]);
+
+  useEffect(() => {
     if (!ready) return;
     const load = async () => {
       const res = await fetch("/api/desk/threads", { headers: { "x-desk-key": key } });

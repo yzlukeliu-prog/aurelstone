@@ -22,28 +22,32 @@ function pushReady() {
 }
 
 async function notifyPhones(thread, text) {
-  if (!pushReady()) return;
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:desk@aurelstone.com.au",
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY,
-  );
-  const subs = await listSubscriptions();
-  const payload = JSON.stringify({
-    title: "Aurelstone desk",
-    body: `${thread.name || "Visitor"}: ${String(text).slice(0, 120)}`,
-  });
-  await Promise.all(
-    subs.map(async (sub) => {
-      try {
-        await webpush.sendNotification(sub, payload);
-      } catch (err) {
-        if (err?.statusCode === 404 || err?.statusCode === 410) {
-          await dropSubscription(sub.endpoint);
+  try {
+    if (!pushReady()) return;
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:desk@aurelstone.com.au",
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY,
+    );
+    const subs = await listSubscriptions();
+    const payload = JSON.stringify({
+      title: "Aurelstone desk",
+      body: `${thread.name || "Visitor"}: ${String(text).slice(0, 120)}`,
+    });
+    await Promise.all(
+      subs.map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub, payload);
+        } catch (err) {
+          if (err?.statusCode === 404 || err?.statusCode === 410) {
+            await dropSubscription(sub.endpoint);
+          }
         }
-      }
-    }),
-  );
+      }),
+    );
+  } catch {
+    /* a failed push must not lose the message */
+  }
 }
 
 export default defineHandler(async (event) => {

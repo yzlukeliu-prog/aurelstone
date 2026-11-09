@@ -37,14 +37,13 @@ async function loadBlob() {
   return { data: JSON.parse(text), etag: result.blob?.etag || "" };
 }
 
-async function saveBlob(data, etag) {
+async function saveBlob(data) {
   await put(BLOB, JSON.stringify(data), {
     access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
     token: token(),
-    ...(etag ? { ifMatch: etag } : {}),
   });
 }
 
@@ -60,23 +59,17 @@ async function load() {
   return loadBlob();
 }
 
-async function save(data, etag) {
+async function save(data) {
   if (!token()) return saveFile(data);
-  return saveBlob(data, etag);
+  return saveBlob(data);
 }
 
 async function update(fn) {
   return locked(async () => {
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const { data, etag } = await load();
-      const next = fn(data);
-      try {
-        await save(data, etag);
-        return next;
-      } catch (err) {
-        if (attempt === 3) throw err;
-      }
-    }
+    const { data } = await load();
+    const next = fn(data);
+    await save(data);
+    return next;
   });
 }
 
