@@ -163,7 +163,7 @@ function tokens(text) {
 function redact(text) {
   return String(text || "")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
-    .replace(/(?:\+?61|0)[\d\s()-]{8,}/g, "[phone]")
+    .replace(/(?:\+?61|0)(?:[\d()-][\d\s()-]{7,})/g, "[phone]")
     .replace(/\b\d{6,}\b/g, "[number]")
     .replace(/\s{2,}/g, " ")
     .trim();
