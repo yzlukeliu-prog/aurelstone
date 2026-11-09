@@ -45,10 +45,11 @@ type Thread = {
 };
 
 const KEY_NAME = "aurelstone-desk-key";
+const DESK_KEY = "aurelstone";
 
 function DeskPage() {
-  const [key, setKey] = useState("");
-  const [ready, setReady] = useState(false);
+  const [key, setKey] = useState(DESK_KEY);
+  const [ready, setReady] = useState(true);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [learned, setLearned] = useState<{ question: string; answer: string }[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -59,11 +60,7 @@ function DeskPage() {
   const primed = useRef(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(KEY_NAME);
-    if (saved) {
-      setKey(saved);
-      setReady(true);
-    }
+    localStorage.setItem(KEY_NAME, DESK_KEY);
   }, []);
 
   useEffect(() => {
