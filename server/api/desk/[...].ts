@@ -129,7 +129,7 @@ export default defineHandler(async (event) => {
     const note = [body.message, body.materials, body.interests].filter(Boolean).join("\n");
     const zhNote = note ? await toChinese(redact(note)) : "";
     const text = lines.join("\n");
-    const zh = [lines.join("\n"), zhNote].filter(Boolean).join("\n");
+    const zh = zhNote;
     const saved = await postVisitor({
       threadId: null,
       text,
