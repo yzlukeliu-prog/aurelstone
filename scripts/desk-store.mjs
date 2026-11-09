@@ -37,13 +37,14 @@ async function loadBlob() {
   return { data: JSON.parse(text), etag: result.blob?.etag || "" };
 }
 
-async function saveBlob(data) {
+async function saveBlob(data, etag) {
   await put(BLOB, JSON.stringify(data), {
     access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
     token: token(),
+    ...(etag ? { ifMatch: etag } : {}),
   });
 }
 
@@ -59,17 +60,28 @@ async function load() {
   return loadBlob();
 }
 
-async function save(data) {
+function isConflict(err) {
+  const name = err?.name || err?.cause?.name || "";
+  return String(name).includes("Precondition") || String(err).includes("Precondition");
+}
+
+async function save(data, etag) {
   if (!token()) return saveFile(data);
-  return saveBlob(data);
+  return saveBlob(data, etag);
 }
 
 async function update(fn) {
   return locked(async () => {
-    const { data } = await load();
-    const next = fn(data);
-    await save(data);
-    return next;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const { data, etag } = await load();
+      const next = fn(data);
+      try {
+        await save(data, etag);
+        return next;
+      } catch (err) {
+        if (!isConflict(err) || attempt === 7) throw err;
+      }
+    }
   });
 }
 
