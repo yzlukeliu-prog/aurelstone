@@ -26,6 +26,10 @@ function saveFile(data) {
   writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
+function version(etag) {
+  return String(etag || "").replace(/^W\//, "").replace(/^"|"$/g, "");
+}
+
 async function loadBlob() {
   const result = await get(BLOB, {
     access: "private",
@@ -34,14 +38,20 @@ async function loadBlob() {
   });
   if (!result || result.statusCode !== 200 || !result.stream) return { data: empty(), etag: "" };
   const text = await new Response(result.stream).text();
-  return { data: JSON.parse(text), etag: result.blob?.etag || "" };
+  return { data: JSON.parse(text), etag: version(result.blob?.etag || "") };
+}
+
+function isConflict(err) {
+  const name = err?.name || err?.cause?.name || "";
+  const text = `${name} ${err?.message || ""} ${err?.cause?.message || ""} ${err}`;
+  return /precondition|already exists|conflicting operation|conditional request/i.test(text);
 }
 
 async function saveBlob(data, etag) {
   await put(BLOB, JSON.stringify(data), {
     access: "private",
     addRandomSuffix: false,
-    allowOverwrite: true,
+    allowOverwrite: Boolean(etag),
     contentType: "application/json",
     token: token(),
     ...(etag ? { ifMatch: etag } : {}),
@@ -60,11 +70,6 @@ async function load() {
   return loadBlob();
 }
 
-function isConflict(err) {
-  const name = err?.name || err?.cause?.name || "";
-  return String(name).includes("Precondition") || String(err).includes("Precondition");
-}
-
 async function save(data, etag) {
   if (!token()) return saveFile(data);
   return saveBlob(data, etag);
@@ -72,14 +77,15 @@ async function save(data, etag) {
 
 async function update(fn) {
   return locked(async () => {
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
       const { data, etag } = await load();
       const next = fn(data);
       try {
         await save(data, etag);
         return next;
       } catch (err) {
-        if (!isConflict(err) || attempt === 7) throw err;
+        if (!isConflict(err) || attempt === 19) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 40 + Math.random() * 160));
       }
     }
   });
