@@ -10,7 +10,7 @@ function token() {
 }
 
 function empty() {
-  return { threads: [], learned: [] };
+  return { threads: [], learned: [], subscriptions: [] };
 }
 
 function loadFile() {
@@ -32,18 +32,19 @@ async function loadBlob() {
     useCache: false,
     token: token(),
   });
-  if (!result || result.statusCode !== 200 || !result.stream) return empty();
+  if (!result || result.statusCode !== 200 || !result.stream) return { data: empty(), etag: "" };
   const text = await new Response(result.stream).text();
-  return JSON.parse(text);
+  return { data: JSON.parse(text), etag: result.blob?.etag || "" };
 }
 
-async function saveBlob(data) {
+async function saveBlob(data, etag) {
   await put(BLOB, JSON.stringify(data), {
     access: "private",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
     token: token(),
+    ...(etag ? { ifMatch: etag } : {}),
   });
 }
 
@@ -55,11 +56,28 @@ function locked(fn) {
 }
 
 async function load() {
-  return token() ? loadBlob() : loadFile();
+  if (!token()) return { data: loadFile(), etag: "" };
+  return loadBlob();
 }
 
-async function save(data) {
-  return token() ? saveBlob(data) : saveFile(data);
+async function save(data, etag) {
+  if (!token()) return saveFile(data);
+  return saveBlob(data, etag);
+}
+
+async function update(fn) {
+  return locked(async () => {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const { data, etag } = await load();
+      const next = fn(data);
+      try {
+        await save(data, etag);
+        return next;
+      } catch (err) {
+        if (attempt === 3) throw err;
+      }
+    }
+  });
 }
 
 function id() {
@@ -67,20 +85,19 @@ function id() {
 }
 
 export async function listThreads() {
-  const data = await load();
+  const { data } = await load();
   return (data.threads || [])
     .slice()
     .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
 }
 
 export async function getThread(threadId) {
-  const data = await load();
+  const { data } = await load();
   return (data.threads || []).find((t) => t.id === threadId) || null;
 }
 
 export async function postVisitor({ threadId, text, name, role = "visitor", status, zh }) {
-  return locked(async () => {
-    const data = await load();
+  return update((data) => {
     data.threads = data.threads || [];
     const now = new Date().toISOString();
     let thread = threadId ? data.threads.find((t) => t.id === threadId) : null;
@@ -98,33 +115,28 @@ export async function postVisitor({ threadId, text, name, role = "visitor", stat
     thread.updatedAt = now;
     if (status) thread.status = status;
     thread.messages.push({ id: id(), role, text, zh: zh || "", at: now });
-    await save(data);
     return thread;
   });
 }
 
 export async function postReply({ threadId, text, role, zh }) {
-  return locked(async () => {
-    const data = await load();
+  return update((data) => {
     const thread = (data.threads || []).find((t) => t.id === threadId);
     if (!thread) return null;
     const now = new Date().toISOString();
     thread.updatedAt = now;
     thread.status = role === "staff" ? "staff" : thread.status;
     thread.messages.push({ id: id(), role, text, zh: zh || "", at: now });
-    await save(data);
     return thread;
   });
 }
 
 export async function setStatus(threadId, status) {
-  return locked(async () => {
-    const data = await load();
+  return update((data) => {
     const thread = (data.threads || []).find((t) => t.id === threadId);
     if (!thread) return null;
     thread.status = status;
     thread.updatedAt = new Date().toISOString();
-    await save(data);
     return thread;
   });
 }
@@ -139,8 +151,7 @@ function tokens(text) {
 
 export async function learn({ question, answer, zh }) {
   if (!question || !answer) return null;
-  return locked(async () => {
-    const data = await load();
+  return update((data) => {
     data.learned = data.learned || [];
     const item = {
       id: id(),
@@ -151,13 +162,12 @@ export async function learn({ question, answer, zh }) {
     };
     data.learned.unshift(item);
     data.learned = data.learned.slice(0, 200);
-    await save(data);
     return item;
   });
 }
 
 export async function findLearned(question) {
-  const data = await load();
+  const { data } = await load();
   const learned = data.learned || [];
   const q = new Set(tokens(question));
   if (!q.size) return null;
@@ -177,6 +187,29 @@ export async function findLearned(question) {
 }
 
 export async function listLearned() {
-  const data = await load();
+  const { data } = await load();
   return data.learned || [];
+}
+
+export async function listSubscriptions() {
+  const { data } = await load();
+  return data.subscriptions || [];
+}
+
+export async function saveSubscription(sub) {
+  if (!sub?.endpoint) return null;
+  return update((data) => {
+    data.subscriptions = data.subscriptions || [];
+    const existing = data.subscriptions.find((s) => s.endpoint === sub.endpoint);
+    if (existing) Object.assign(existing, sub);
+    else data.subscriptions.push(sub);
+    return sub;
+  });
+}
+
+export async function dropSubscription(endpoint) {
+  return update((data) => {
+    data.subscriptions = (data.subscriptions || []).filter((s) => s.endpoint !== endpoint);
+    return true;
+  });
 }

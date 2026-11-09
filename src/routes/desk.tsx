@@ -71,6 +71,7 @@ function DeskPage() {
   const [notice, setNotice] = useState("");
   const seen = useRef<Set<string>>(new Set());
   const primed = useRef(false);
+  const lastMsg = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     const saved = readSavedKey();
@@ -90,16 +91,25 @@ function DeskPage() {
         return;
       }
       const data = (await res.json()) as { threads: Thread[]; learned?: { question: string; answer: string }[] };
-      const incoming = data.threads.filter((t) => !seen.current.has(t.id));
+      const incoming = data.threads.filter((t) => {
+        const last = t.messages[t.messages.length - 1];
+        const prev = lastMsg.current.get(t.id);
+        return last && last.role === "visitor" && last.id !== prev;
+      });
       if (primed.current && incoming.length) {
         const first = incoming[0];
-        setNotice(`${first.name} 有新消息`);
+        const last = first.messages[first.messages.length - 1];
+        setNotice(`${first.name}：${last.zh || last.text}`);
         try { chime(); } catch { /* sound needs a user gesture on some phones */ }
         if (Notification.permission === "granted") {
-          new Notification("Aurelstone desk", { body: `${first.name} sent a request` });
+          new Notification("Aurelstone desk", { body: `${first.name}: ${last.text}` });
         }
       }
-      for (const t of data.threads) seen.current.add(t.id);
+      for (const t of data.threads) {
+        seen.current.add(t.id);
+        const last = t.messages[t.messages.length - 1];
+        if (last) lastMsg.current.set(t.id, last.id);
+      }
       primed.current = true;
       setThreads(data.threads);
       setLearned(data.learned || []);
@@ -160,12 +170,27 @@ function DeskPage() {
         <button
           type="button"
           className="mt-3 text-sm underline"
-          onClick={() => {
-            void Notification.requestPermission();
+          onClick={async () => {
+            const permission = await Notification.requestPermission();
             try { chime(); } catch { /* ignore */ }
+            if (permission !== "granted" || !("serviceWorker" in navigator)) return;
+            const reg = await navigator.serviceWorker.register("/desk-sw.js");
+            const keyRes = await fetch("/api/desk/push-key");
+            const { key: publicKey } = await keyRes.json();
+            if (!publicKey) return;
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: publicKey,
+            });
+            await fetch("/api/desk/subscribe", {
+              method: "POST",
+              headers: { "content-type": "application/json", "x-desk-key": key },
+              body: JSON.stringify({ subscription: sub.toJSON() }),
+            });
+            setNotice("手机通知已开启。即使关掉客服台，也会收到弹窗。");
           }}
         >
-          开启提示音和弹窗
+          开启手机通知
         </button>
         {notice ? <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm">{notice}</p> : null}
         <p className="mt-2 text-xs text-muted">已记住 {learned.length} 条</p>
@@ -178,7 +203,9 @@ function DeskPage() {
                 className="w-full rounded-lg bg-surface px-3 py-3 text-left text-sm"
               >
                 <span className="block">{t.name}</span>
-                <span className="text-xs text-muted">{t.status}</span>
+                <span className="block truncate text-xs text-muted">
+                  {t.messages[t.messages.length - 1]?.zh || t.messages[t.messages.length - 1]?.text || t.status}
+                </span>
               </button>
             </li>
           ))}

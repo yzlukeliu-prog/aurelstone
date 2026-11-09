@@ -1,17 +1,50 @@
 import { defineHandler } from "nitro";
+import webpush from "web-push";
 import {
+  dropSubscription,
   findLearned,
   getThread,
   learn,
   listLearned,
+  listSubscriptions,
   listThreads,
   postReply,
   postVisitor,
+  saveSubscription,
   setStatus,
 } from "../../../scripts/desk-store.mjs";
 import { toChinese, toEnglish, hasChinese } from "../../../scripts/translate.mjs";
 
 const KEY = process.env.DESK_KEY || "aurelstone";
+
+function pushReady() {
+  return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+}
+
+async function notifyPhones(thread, text) {
+  if (!pushReady()) return;
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:desk@aurelstone.com.au",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+  const subs = await listSubscriptions();
+  const payload = JSON.stringify({
+    title: "Aurelstone desk",
+    body: `${thread.name || "Visitor"}: ${String(text).slice(0, 120)}`,
+  });
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
+          await dropSubscription(sub.endpoint);
+        }
+      }
+    }),
+  );
+}
 
 export default defineHandler(async (event) => {
   const url = new URL(event.req.url);
@@ -31,6 +64,7 @@ export default defineHandler(async (event) => {
       status: body.status,
       zh,
     });
+    if (role === "visitor") void notifyPhones(thread, text);
     return { thread };
   }
 
@@ -63,11 +97,16 @@ export default defineHandler(async (event) => {
       status: "waiting",
       zh,
     });
+    void notifyPhones(thread, text);
     return { thread };
   }
 
   if (path === "/api/desk/answer" && method === "GET") {
     return { hit: await findLearned(url.searchParams.get("q") || "") };
+  }
+
+  if (path === "/api/desk/push-key" && method === "GET") {
+    return { key: process.env.VAPID_PUBLIC_KEY || "" };
   }
 
   const staff = event.req.headers.get("x-desk-key") === KEY;
@@ -76,7 +115,7 @@ export default defineHandler(async (event) => {
     return { error: "unauthorised" };
   }
   if (path === "/api/desk/threads" && method === "GET") {
-    return { threads: await listThreads(), learned: await listLearned(), store: process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "file" };
+    return { threads: await listThreads(), learned: await listLearned() };
   }
   if (path === "/api/desk/reply" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
@@ -101,6 +140,11 @@ export default defineHandler(async (event) => {
     const thread = await setStatus(body.threadId, body.status);
     if (!thread) event.res.status = 404;
     return { thread };
+  }
+  if (path === "/api/desk/subscribe" && method === "POST") {
+    const body = await event.req.json().catch(() => ({}));
+    await saveSubscription(body.subscription);
+    return { ok: true };
   }
   event.res.status = 404;
   return { error: "not found" };
