@@ -4,7 +4,10 @@ import { get, put } from "@vercel/blob";
 
 const file = join(process.cwd(), "data", "desk.json");
 const BLOB = "desk.json";
-const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+
+function token() {
+  return process.env.BLOB_READ_WRITE_TOKEN || "";
+}
 
 function empty() {
   return { threads: [], learned: [] };
@@ -24,14 +27,14 @@ function saveFile(data) {
 }
 
 async function loadBlob() {
-  try {
-    const result = await get(BLOB, { access: "private", token: process.env.BLOB_READ_WRITE_TOKEN });
-    if (!result || result.statusCode !== 200 || !result.stream) return empty();
-    const text = await new Response(result.stream).text();
-    return JSON.parse(text);
-  } catch {
-    return empty();
-  }
+  const result = await get(BLOB, {
+    access: "private",
+    useCache: false,
+    token: token(),
+  });
+  if (!result || result.statusCode !== 200 || !result.stream) return empty();
+  const text = await new Response(result.stream).text();
+  return JSON.parse(text);
 }
 
 async function saveBlob(data) {
@@ -40,7 +43,7 @@ async function saveBlob(data) {
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
-    token: process.env.BLOB_READ_WRITE_TOKEN,
+    token: token(),
   });
 }
 
@@ -52,11 +55,11 @@ function locked(fn) {
 }
 
 async function load() {
-  return useBlob ? loadBlob() : loadFile();
+  return token() ? loadBlob() : loadFile();
 }
 
 async function save(data) {
-  return useBlob ? saveBlob(data) : saveFile(data);
+  return token() ? saveBlob(data) : saveFile(data);
 }
 
 function id() {

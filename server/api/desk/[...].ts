@@ -76,7 +76,7 @@ export default defineHandler(async (event) => {
     return { error: "unauthorised" };
   }
   if (path === "/api/desk/threads" && method === "GET") {
-    return { threads: await listThreads(), learned: await listLearned() };
+    return { threads: await listThreads(), learned: await listLearned(), store: process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "file" };
   }
   if (path === "/api/desk/reply" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
