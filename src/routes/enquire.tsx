@@ -36,6 +36,9 @@ function EnquirePage() {
           <br />
           Or {site.email}
         </p>
+        <p className="mt-4 text-sm text-muted">
+          Your name, phone and email stay with the showroom. They are not sent to the translator. Only the note about the rooms is translated.
+        </p>
       </div>
       <div className="rounded-xl bg-bg-elevated p-6 md:col-span-6 md:col-start-7 md:p-8">
         <QuoteForm />

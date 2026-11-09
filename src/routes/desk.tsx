@@ -68,6 +68,7 @@ function DeskPage() {
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
+  const [edits, setEdits] = useState<Record<string, { question: string; answer: string }>>({});
   const [notice, setNotice] = useState("");
   const seen = useRef<Set<string>>(new Set());
   const primed = useRef(false);
@@ -149,10 +150,14 @@ function DeskPage() {
       headers: { "content-type": "application/json", "x-desk-key": key },
       body: JSON.stringify({ threadId: current.id, text: text.trim() }),
     });
-    if (!res.ok) return;
-    const data = (await res.json()) as { thread: Thread };
-    setThreads((list) => list.map((t) => (t.id === data.thread.id ? data.thread : t)));
+    const data = (await res.json().catch(() => ({}))) as { thread?: Thread; error?: string };
+    if (!res.ok || !data.thread) {
+      setNotice(data.error === "translation_failed" ? "翻译失败，中文没有发给客人。" : "发送失败，请再试一次。");
+      return;
+    }
+    setThreads((list) => list.map((t) => (t.id === data.thread!.id ? data.thread! : t)));
     setText("");
+    setNotice("");
   }
 
   if (!ready) {
@@ -202,11 +207,16 @@ function DeskPage() {
               userVisibleOnly: true,
               applicationServerKey: publicKey,
             });
-            await fetch("/api/desk/subscribe", {
+            const saved = await fetch("/api/desk/subscribe", {
               method: "POST",
               headers: { "content-type": "application/json", "x-desk-key": key },
               body: JSON.stringify({ subscription: sub.toJSON() }),
             });
+            const result = (await saved.json().catch(() => ({}))) as { ok?: boolean };
+            if (!saved.ok || !result.ok) {
+              setNotice("手机通知没有开启，请再试一次。");
+              return;
+            }
             setNotice("手机通知已开启。即使关掉客服台，也会收到弹窗。");
           }}
         >
@@ -216,24 +226,76 @@ function DeskPage() {
         <p className="mt-2 text-xs text-muted">
           问答草稿 {learned.filter((item) => !item.published).length} 条，已公开 {learned.filter((item) => item.published).length} 条。回复不会自动公开。
         </p>
-        <ul className="mt-3 space-y-2">
-          {learned.filter((item) => !item.published).slice(0, 5).map((item) => (
-            <li key={item.id} className="rounded-lg bg-surface px-3 py-2 text-xs">
-              <p className="truncate">{item.question}</p>
-              <button
-                type="button"
-                className="mt-1 underline"
-                onClick={async () => {
-                  await fetch("/api/desk/publish", {
-                    method: "POST",
-                    headers: { "content-type": "application/json", "x-desk-key": key },
-                    body: JSON.stringify({ id: item.id }),
-                  });
-                  setNotice("这条已审核并公开。电话和邮箱会先被去掉。");
+        <ul className="mt-3 space-y-3">
+          {learned.map((item) => (
+            <li key={item.id} className="rounded-lg bg-surface px-3 py-3 text-xs">
+              <p className="text-muted">{item.published ? "已公开" : "草稿"}</p>
+              <label className="mt-2 block text-muted">将公开的问题</label>
+              <textarea
+                value={edits[item.id]?.question ?? item.question}
+                className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-1"
+                onChange={(e) => {
+                  setEdits((prev) => ({
+                    ...prev,
+                    [item.id]: {
+                      question: e.target.value,
+                      answer: prev[item.id]?.answer ?? item.answer,
+                    },
+                  }));
                 }}
-              >
-                审核后公开
-              </button>
+              />
+              <label className="mt-2 block text-muted">将公开的答案</label>
+              <textarea
+                value={edits[item.id]?.answer ?? item.answer}
+                className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-1"
+                onChange={(e) => {
+                  setEdits((prev) => ({
+                    ...prev,
+                    [item.id]: {
+                      question: prev[item.id]?.question ?? item.question,
+                      answer: e.target.value,
+                    },
+                  }));
+                }}
+              />
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={async () => {
+                    const question = edits[item.id]?.question ?? item.question;
+                    const answer = edits[item.id]?.answer ?? item.answer;
+                    const res = await fetch("/api/desk/publish", {
+                      method: "POST",
+                      headers: { "content-type": "application/json", "x-desk-key": key },
+                      body: JSON.stringify({ id: item.id, question, answer }),
+                    });
+                    if (!res.ok) {
+                      setNotice("公开失败，没有发出去。");
+                      return;
+                    }
+                    setNotice("已按上面的文字公开。电话、邮箱和长数字会先被去掉。");
+                  }}
+                >
+                  确认公开
+                </button>
+                {item.published ? (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={async () => {
+                      const res = await fetch("/api/desk/unpublish", {
+                        method: "POST",
+                        headers: { "content-type": "application/json", "x-desk-key": key },
+                        body: JSON.stringify({ id: item.id }),
+                      });
+                      setNotice(res.ok ? "已撤回，公开接口不再返回。" : "撤回失败。");
+                    }}
+                  >
+                    撤回
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

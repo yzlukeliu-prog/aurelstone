@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { answerFromSite } from "@/lib/desk-knowledge";
 
 type Msg = { id: string; role: "visitor" | "assistant" | "staff"; text: string };
 
@@ -10,6 +9,18 @@ type Thread = {
 };
 
 const KEY = "aurelstone-thread";
+
+function readSession() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { id?: string; token?: string };
+    if (parsed.id && parsed.token) return parsed;
+  } catch {
+    /* old id-only value is no longer valid */
+  }
+  return null;
+}
 
 async function post(path: string, body: unknown) {
   const res = await fetch(path, {
@@ -23,7 +34,7 @@ async function post(path: string, body: unknown) {
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [session, setSession] = useState<{ id: string; token: string } | null>(null);
   const [messages, setMessages] = useState<Msg[]>([
     {
       id: "hello",
@@ -36,8 +47,8 @@ export function ChatWidget() {
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(KEY);
-    if (saved) setThreadId(saved);
+    const saved = readSession();
+    if (saved) setSession(saved);
   }, []);
 
   useEffect(() => {
@@ -45,9 +56,14 @@ export function ChatWidget() {
   }, [messages, open]);
 
   useEffect(() => {
-    if (!open || !threadId) return;
+    if (!open || !session) return;
     const tick = async () => {
-      const res = await fetch(`/api/desk/thread?id=${threadId}`);
+      const res = await fetch(`/api/desk/thread?id=${session.id}&token=${session.token}`);
+      if (res.status === 403) {
+        localStorage.removeItem(KEY);
+        setSession(null);
+        return;
+      }
       if (!res.ok) return;
       const data = (await res.json()) as { thread: Thread | null };
       if (!data.thread) return;
@@ -60,7 +76,7 @@ export function ChatWidget() {
     };
     const id = window.setInterval(tick, 4000);
     return () => window.clearInterval(id);
-  }, [open, threadId]);
+  }, [open, session]);
 
   async function send() {
     const value = text.trim();
@@ -70,30 +86,23 @@ export function ChatWidget() {
     const mine: Msg = { id: crypto.randomUUID(), role: "visitor", text: value };
     setMessages((m) => [...m, mine]);
     try {
-      const saved = await post("/api/desk/message", { threadId, text: value });
-      const id = saved.thread.id as string;
-      setThreadId(id);
-      localStorage.setItem(KEY, id);
-      const learnedRes = await fetch(`/api/desk/answer?q=${encodeURIComponent(value)}`);
-      const learned = learnedRes.ok ? await learnedRes.json() : { hit: null };
-      const reply = learned.hit
-        ? { text: learned.hit.answer, handoff: false }
-        : answerFromSite(value);
-      const bot: Msg = { id: crypto.randomUUID(), role: "assistant", text: reply.text };
-      setMessages((m) => [...m, bot]);
-      await post("/api/desk/message", {
-        threadId: id,
-        text: reply.text,
-        role: "assistant",
-        status: reply.handoff ? "waiting" : undefined,
+      const saved = await post("/api/desk/message", {
+        threadId: session?.id,
+        token: session?.token,
+        text: value,
       });
+      const next = { id: saved.thread.id as string, token: saved.token as string };
+      setSession(next);
+      localStorage.setItem(KEY, JSON.stringify(next));
+      const assistant = (saved.thread.messages as Msg[]).filter((m) => m.role === "assistant").at(-1);
+      if (assistant) setMessages((m) => [...m, assistant]);
     } catch {
       setMessages((m) => [
         ...m,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: "The desk is briefly unavailable. Call 03 9429 0188 or use the Enquire page.",
+          text: "The desk is briefly unavailable. Please use the Enquire page.",
         },
       ]);
     } finally {
@@ -147,6 +156,9 @@ export function ChatWidget() {
               Send
             </button>
           </form>
+          <p className="px-3 pb-3 text-[11px] text-muted">
+            Messages are stored for the showroom. Phone numbers and emails are removed before any translation.
+          </p>
         </div>
       ) : null}
       <button

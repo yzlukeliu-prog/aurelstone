@@ -1,8 +1,10 @@
 import { defineHandler } from "nitro";
 import * as webpush from "web-push";
+import { answerFromSite } from "../../../src/lib/desk-knowledge";
 import {
   dropSubscription,
   findLearned,
+  getOwnedThread,
   getThread,
   learn,
   listLearned,
@@ -11,12 +13,19 @@ import {
   postReply,
   postVisitor,
   publishLearned,
+  redact,
   saveSubscription,
   setStatus,
+  unpublishLearned,
+  updateLearned,
 } from "../../../scripts/desk-store.mjs";
 import { toChinese, toEnglish, hasChinese } from "../../../scripts/translate.mjs";
 
-const KEY = process.env.DESK_KEY || "aurelstone";
+function staffKey() {
+  const key = process.env.DESK_KEY || "";
+  if (!key || key === "aurelstone") return "";
+  return key;
+}
 
 function pushReady() {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -60,23 +69,46 @@ export default defineHandler(async (event) => {
 
   if (path === "/api/desk/message" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
-    const role = body.role === "assistant" ? "assistant" : "visitor";
     const text = String(body.text || "").slice(0, 2000);
-    const zh = await toChinese(text);
-    const thread = await postVisitor({
+    if (!text) {
+      event.res.status = 400;
+      return { error: "empty" };
+    }
+    const zh = await toChinese(redact(text));
+    const saved = await postVisitor({
       threadId: body.threadId,
+      token: body.token,
       text,
       name: body.name,
-      role,
-      status: body.status,
       zh,
     });
-    if (role === "visitor") void notifyPhones(thread, text);
-    return { thread };
+    if (saved?.error) {
+      event.res.status = saved.error === "forbidden" ? 403 : 404;
+      return { error: saved.error };
+    }
+    const learned = await findLearned(text);
+    const reply = learned?.answer
+      ? { text: learned.answer, handoff: false }
+      : answerFromSite(text);
+    await postReply({
+      threadId: saved.thread.id,
+      text: reply.text,
+      role: "assistant",
+      zh: "",
+    });
+    if (reply.handoff) await setStatus(saved.thread.id, "waiting");
+    void notifyPhones(saved.thread, text);
+    const thread = await getOwnedThread(saved.thread.id, saved.token);
+    return { thread, token: saved.token };
   }
 
   if (path === "/api/desk/thread" && method === "GET") {
-    return { thread: await getThread(url.searchParams.get("id")) };
+    const thread = await getOwnedThread(url.searchParams.get("id"), url.searchParams.get("token"));
+    if (!thread) {
+      event.res.status = 403;
+      return { error: "forbidden" };
+    }
+    return { thread };
   }
 
   if (path === "/api/desk/enquiry" && method === "POST") {
@@ -94,18 +126,19 @@ export default defineHandler(async (event) => {
       body.interests ? `Interests: ${body.interests}` : "",
       body.message ? `Note: ${body.message}` : "",
     ].filter(Boolean);
+    const note = [body.message, body.materials, body.interests].filter(Boolean).join("\n");
+    const zhNote = note ? await toChinese(redact(note)) : "";
     const text = lines.join("\n");
-    const zh = await toChinese(text);
-    const thread = await postVisitor({
+    const zh = [lines.join("\n"), zhNote].filter(Boolean).join("\n");
+    const saved = await postVisitor({
       threadId: null,
       text,
       name,
-      role: "visitor",
-      status: "waiting",
       zh,
     });
-    void notifyPhones(thread, text);
-    return { thread };
+    await setStatus(saved.thread.id, "waiting");
+    void notifyPhones(saved.thread, text);
+    return { ok: true };
   }
 
   if (path === "/api/desk/answer" && method === "GET") {
@@ -117,7 +150,8 @@ export default defineHandler(async (event) => {
     return { key: process.env.VAPID_PUBLIC_KEY || "" };
   }
 
-  const staff = event.req.headers.get("x-desk-key") === KEY;
+  const key = staffKey();
+  const staff = key && event.req.headers.get("x-desk-key") === key;
   if (!staff) {
     event.res.status = 401;
     return { error: "unauthorised" };
@@ -128,8 +162,17 @@ export default defineHandler(async (event) => {
   if (path === "/api/desk/reply" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
     const raw = String(body.text || "").slice(0, 2000);
-    const english = hasChinese(raw) ? await toEnglish(raw) : raw;
-    const zh = hasChinese(raw) ? raw : "";
+    let english = raw;
+    let zh = "";
+    if (hasChinese(raw)) {
+      try {
+        english = await toEnglish(raw);
+        zh = raw;
+      } catch {
+        event.res.status = 502;
+        return { error: "translation_failed" };
+      }
+    }
     const thread = await postReply({
       threadId: body.threadId,
       text: english,
@@ -151,9 +194,38 @@ export default defineHandler(async (event) => {
   }
   if (path === "/api/desk/publish" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
-    const item = await publishLearned(String(body.id || ""));
-    if (!item) event.res.status = 404;
+    const item = await publishLearned(String(body.id || ""), {
+      question: body.question,
+      answer: body.answer,
+      zh: body.zh,
+    });
+    if (!item) {
+      event.res.status = 404;
+      return { error: "not_found" };
+    }
     return { item, published: true };
+  }
+  if (path === "/api/desk/unpublish" && method === "POST") {
+    const body = await event.req.json().catch(() => ({}));
+    const item = await unpublishLearned(String(body.id || ""));
+    if (!item) {
+      event.res.status = 404;
+      return { error: "not_found" };
+    }
+    return { item, published: false };
+  }
+  if (path === "/api/desk/learn-edit" && method === "POST") {
+    const body = await event.req.json().catch(() => ({}));
+    const item = await updateLearned(String(body.id || ""), {
+      question: body.question,
+      answer: body.answer,
+      zh: body.zh,
+    });
+    if (!item) {
+      event.res.status = 404;
+      return { error: "not_found" };
+    }
+    return { item };
   }
   if (path === "/api/desk/status" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
@@ -163,7 +235,11 @@ export default defineHandler(async (event) => {
   }
   if (path === "/api/desk/subscribe" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
-    await saveSubscription(body.subscription);
+    const saved = await saveSubscription(body.subscription);
+    if (!saved) {
+      event.res.status = 400;
+      return { ok: false, error: "subscribe_failed" };
+    }
     return { ok: true };
   }
   if (path === "/api/desk/test-push" && method === "POST") {

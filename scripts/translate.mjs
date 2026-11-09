@@ -30,14 +30,10 @@ export async function toChinese(text) {
 
 export async function toEnglish(text) {
   if (!text || !hasChinese(text)) return text;
-  try {
-    const out = await translate(text, "zh-CN", "en");
-    return out
-      .replace(/exhibition hall/gi, "showroom")
-      .replace(/show room/gi, "showroom");
-  } catch {
-    return text;
-  }
+  const out = await translate(text, "zh-CN", "en");
+  return out
+    .replace(/exhibition hall/gi, "showroom")
+    .replace(/show room/gi, "showroom");
 }
 
 export { hasChinese };

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { get, put } from "@vercel/blob";
@@ -95,11 +96,22 @@ function id() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function secret() {
+  return randomBytes(24).toString("hex");
+}
+
+function withoutSecret(thread) {
+  if (!thread) return null;
+  const { token, ...rest } = thread;
+  return rest;
+}
+
 export async function listThreads() {
   const { data } = await load();
   return (data.threads || [])
     .slice()
-    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+    .map(withoutSecret);
 }
 
 export async function getThread(threadId) {
@@ -107,14 +119,24 @@ export async function getThread(threadId) {
   return (data.threads || []).find((t) => t.id === threadId) || null;
 }
 
-export async function postVisitor({ threadId, text, name, role = "visitor", status, zh }) {
+export async function getOwnedThread(threadId, token) {
+  const thread = await getThread(threadId);
+  if (!thread || !thread.token || thread.token !== token) return null;
+  return withoutSecret(thread);
+}
+
+export async function postVisitor({ threadId, token, text, name, zh }) {
   return update((data) => {
     data.threads = data.threads || [];
     const now = new Date().toISOString();
     let thread = threadId ? data.threads.find((t) => t.id === threadId) : null;
+    if (threadId && (!thread || !thread.token || thread.token !== token)) {
+      return { error: thread ? "forbidden" : "not_found" };
+    }
     if (!thread) {
       thread = {
         id: id(),
+        token: secret(),
         name: name || "Visitor",
         createdAt: now,
         updatedAt: now,
@@ -124,9 +146,9 @@ export async function postVisitor({ threadId, text, name, role = "visitor", stat
       data.threads.unshift(thread);
     }
     thread.updatedAt = now;
-    if (status) thread.status = status;
-    thread.messages.push({ id: id(), role, text, zh: zh || "", at: now });
-    return thread;
+    thread.messages.push({ id: id(), role: "visitor", text, zh: zh || "", at: now });
+    if (name && name !== "Visitor") thread.name = name;
+    return { thread: withoutSecret(thread), token: thread.token };
   });
 }
 
@@ -138,7 +160,7 @@ export async function postReply({ threadId, text, role, zh }) {
     thread.updatedAt = now;
     thread.status = role === "staff" ? "staff" : thread.status;
     thread.messages.push({ id: id(), role, text, zh: zh || "", at: now });
-    return thread;
+    return withoutSecret(thread);
   });
 }
 
@@ -148,7 +170,7 @@ export async function setStatus(threadId, status) {
     if (!thread) return null;
     thread.status = status;
     thread.updatedAt = new Date().toISOString();
-    return thread;
+    return withoutSecret(thread);
   });
 }
 
@@ -160,7 +182,7 @@ function tokens(text) {
     .filter((w) => w.length > 2);
 }
 
-function redact(text) {
+export function redact(text) {
   return String(text || "")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
     .replace(/(?:\+?61|0)(?:[\d()-][\d\s()-]{7,})/g, "[phone]")
@@ -190,14 +212,37 @@ export async function learn({ question, answer, zh }) {
   });
 }
 
-export async function publishLearned(itemId) {
+export async function publishLearned(itemId, edits = {}) {
   return update((data) => {
     const item = (data.learned || []).find((entry) => entry.id === itemId);
     if (!item) return null;
+    if (edits.question) item.question = redact(edits.question);
+    if (edits.answer) item.answer = redact(edits.answer);
+    if (edits.zh) item.zh = redact(edits.zh);
     item.question = redact(item.question);
     item.answer = redact(item.answer);
     item.zh = redact(item.zh);
     item.published = true;
+    return item;
+  });
+}
+
+export async function updateLearned(itemId, edits = {}) {
+  return update((data) => {
+    const item = (data.learned || []).find((entry) => entry.id === itemId);
+    if (!item) return null;
+    if (edits.question != null) item.question = redact(edits.question);
+    if (edits.answer != null) item.answer = redact(edits.answer);
+    if (edits.zh != null) item.zh = redact(edits.zh);
+    return item;
+  });
+}
+
+export async function unpublishLearned(itemId) {
+  return update((data) => {
+    const item = (data.learned || []).find((entry) => entry.id === itemId);
+    if (!item) return null;
+    item.published = false;
     return item;
   });
 }

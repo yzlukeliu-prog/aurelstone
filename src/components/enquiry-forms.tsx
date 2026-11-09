@@ -228,6 +228,9 @@ export function VisitForm() {
       <Button type="submit" size="lg">
         Request this visit
       </Button>
+      <p className="text-sm text-subtle">
+        Name, phone and email are kept for this visit and are not sent for translation.
+      </p>
     </form>
   );
 }
@@ -389,6 +392,9 @@ export function QuoteForm() {
         Send enquiry
       </Button>
       <p className="text-sm text-subtle">
+        Name, phone and email are kept for this enquiry and are not sent for translation.
+      </p>
+      <p className="text-sm text-subtle">
         If you are specifying with a builder, include their name and any
         drawings. We will send a sample set to the site or the office.
       </p>
@@ -508,6 +514,9 @@ export function SampleForm({ selected }: { selected: Material[] }) {
       <Button type="submit" size="lg" disabled={!selected.length}>
         Request samples
       </Button>
+      <p className="text-sm text-subtle">
+        Name, phone and email are kept for this request and are not sent for translation.
+      </p>
     </form>
   );
 }
