@@ -23,7 +23,7 @@ export default defineHandler(async (event) => {
     const role = body.role === "assistant" ? "assistant" : "visitor";
     const text = String(body.text || "").slice(0, 2000);
     const zh = await toChinese(text);
-    const thread = postVisitor({
+    const thread = await postVisitor({
       threadId: body.threadId,
       text,
       name: body.name,
@@ -35,7 +35,7 @@ export default defineHandler(async (event) => {
   }
 
   if (path === "/api/desk/thread" && method === "GET") {
-    return { thread: getThread(url.searchParams.get("id")) };
+    return { thread: await getThread(url.searchParams.get("id")) };
   }
 
   if (path === "/api/desk/enquiry" && method === "POST") {
@@ -55,7 +55,7 @@ export default defineHandler(async (event) => {
     ].filter(Boolean);
     const text = lines.join("\n");
     const zh = await toChinese(text);
-    const thread = postVisitor({
+    const thread = await postVisitor({
       threadId: null,
       text,
       name,
@@ -67,7 +67,7 @@ export default defineHandler(async (event) => {
   }
 
   if (path === "/api/desk/answer" && method === "GET") {
-    return { hit: findLearned(url.searchParams.get("q") || "") };
+    return { hit: await findLearned(url.searchParams.get("q") || "") };
   }
 
   const staff = event.req.headers.get("x-desk-key") === KEY;
@@ -76,14 +76,14 @@ export default defineHandler(async (event) => {
     return { error: "unauthorised" };
   }
   if (path === "/api/desk/threads" && method === "GET") {
-    return { threads: listThreads(), learned: listLearned() };
+    return { threads: await listThreads(), learned: await listLearned() };
   }
   if (path === "/api/desk/reply" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
     const raw = String(body.text || "").slice(0, 2000);
     const english = hasChinese(raw) ? await toEnglish(raw) : raw;
     const zh = hasChinese(raw) ? raw : "";
-    const thread = postReply({
+    const thread = await postReply({
       threadId: body.threadId,
       text: english,
       role: "staff",
@@ -91,14 +91,14 @@ export default defineHandler(async (event) => {
     });
     if (thread) {
       const lastVisitor = [...thread.messages].reverse().find((m) => m.role === "visitor");
-      if (lastVisitor) learn({ question: lastVisitor.text, answer: english, zh });
+      if (lastVisitor) await learn({ question: lastVisitor.text, answer: english, zh });
     }
     if (!thread) event.res.status = 404;
     return { thread, learned: true };
   }
   if (path === "/api/desk/status" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
-    const thread = setStatus(body.threadId, body.status);
+    const thread = await setStatus(body.threadId, body.status);
     if (!thread) event.res.status = 404;
     return { thread };
   }

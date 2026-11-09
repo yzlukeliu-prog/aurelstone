@@ -49,7 +49,7 @@ export function deskApiPlugin() {
             const role = body.role === "assistant" ? "assistant" : "visitor";
             const text = String(body.text || "").slice(0, 2000);
             const zh = role === "visitor" || role === "assistant" ? await toChinese(text) : "";
-            const thread = postVisitor({
+            const thread = await postVisitor({
               threadId: body.threadId,
               text,
               name: body.name,
@@ -61,7 +61,7 @@ export function deskApiPlugin() {
           }
           if (path === "/api/desk/thread" && method === "GET") {
             const id = new URL(req.url, "http://local").searchParams.get("id");
-            return send(res, 200, { thread: getThread(id) });
+            return send(res, 200, { thread: await getThread(id) });
           }
           if (path === "/api/desk/enquiry" && method === "POST") {
             const body = await readBody(req);
@@ -80,7 +80,7 @@ export function deskApiPlugin() {
             ].filter(Boolean);
             const text = lines.join("\n");
             const zh = await toChinese(text);
-            const thread = postVisitor({
+            const thread = await postVisitor({
               threadId: null,
               text,
               name,
@@ -92,20 +92,20 @@ export function deskApiPlugin() {
           }
           if (path === "/api/desk/answer" && method === "GET") {
             const q = new URL(req.url, "http://local").searchParams.get("q") || "";
-            const hit = findLearned(q);
+            const hit = await findLearned(q);
             return send(res, 200, { hit });
           }
           const staff = req.headers["x-desk-key"] === KEY;
           if (!staff) return send(res, 401, { error: "unauthorised" });
           if (path === "/api/desk/threads" && method === "GET") {
-            return send(res, 200, { threads: listThreads(), learned: listLearned() });
+            return send(res, 200, { threads: await listThreads(), learned: await listLearned() });
           }
           if (path === "/api/desk/reply" && method === "POST") {
             const body = await readBody(req);
             const raw = String(body.text || "").slice(0, 2000);
             const english = hasChinese(raw) ? await toEnglish(raw) : raw;
             const zh = hasChinese(raw) ? raw : "";
-            const thread = postReply({
+            const thread = await postReply({
               threadId: body.threadId,
               text: english,
               role: "staff",
@@ -114,14 +114,14 @@ export function deskApiPlugin() {
             if (thread) {
               const lastVisitor = [...thread.messages].reverse().find((m) => m.role === "visitor");
               if (lastVisitor) {
-                learn({ question: lastVisitor.text, answer: english, zh });
+                await learn({ question: lastVisitor.text, answer: english, zh });
               }
             }
             return send(res, thread ? 200 : 404, { thread, learned: true });
           }
           if (path === "/api/desk/status" && method === "POST") {
             const body = await readBody(req);
-            const thread = setStatus(body.threadId, body.status);
+            const thread = await setStatus(body.threadId, body.status);
             return send(res, thread ? 200 : 404, { thread });
           }
           return send(res, 404, { error: "not found" });
