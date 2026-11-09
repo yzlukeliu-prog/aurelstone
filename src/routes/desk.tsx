@@ -64,7 +64,7 @@ function DeskPage() {
   const [key, setKey] = useState("");
   const [ready, setReady] = useState(false);
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [learned, setLearned] = useState<{ question: string; answer: string }[]>([]);
+  const [learned, setLearned] = useState<{ id: string; question: string; answer: string; published?: boolean }[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
@@ -110,7 +110,7 @@ function DeskPage() {
         setReady(false);
         return;
       }
-      const data = (await res.json()) as { threads: Thread[]; learned?: { question: string; answer: string }[] };
+      const data = (await res.json()) as { threads: Thread[]; learned?: { id: string; question: string; answer: string; published?: boolean }[] };
       const incoming = data.threads.filter((t) => {
         const last = t.messages[t.messages.length - 1];
         const prev = lastMsg.current.get(t.id);
@@ -213,7 +213,30 @@ function DeskPage() {
           开启手机通知
         </button>
         {notice ? <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm">{notice}</p> : null}
-        <p className="mt-2 text-xs text-muted">已记住 {learned.length} 条</p>
+        <p className="mt-2 text-xs text-muted">
+          问答草稿 {learned.filter((item) => !item.published).length} 条，已公开 {learned.filter((item) => item.published).length} 条。回复不会自动公开。
+        </p>
+        <ul className="mt-3 space-y-2">
+          {learned.filter((item) => !item.published).slice(0, 5).map((item) => (
+            <li key={item.id} className="rounded-lg bg-surface px-3 py-2 text-xs">
+              <p className="truncate">{item.question}</p>
+              <button
+                type="button"
+                className="mt-1 underline"
+                onClick={async () => {
+                  await fetch("/api/desk/publish", {
+                    method: "POST",
+                    headers: { "content-type": "application/json", "x-desk-key": key },
+                    body: JSON.stringify({ id: item.id }),
+                  });
+                  setNotice("这条已审核并公开。电话和邮箱会先被去掉。");
+                }}
+              >
+                审核后公开
+              </button>
+            </li>
+          ))}
+        </ul>
         <ul className="mt-6 space-y-2">
           {threads.map((t) => (
             <li key={t.id}>

@@ -10,6 +10,7 @@ import {
   listThreads,
   postReply,
   postVisitor,
+  publishLearned,
   saveSubscription,
   setStatus,
 } from "../../../scripts/desk-store.mjs";
@@ -108,7 +109,8 @@ export default defineHandler(async (event) => {
   }
 
   if (path === "/api/desk/answer" && method === "GET") {
-    return { hit: await findLearned(url.searchParams.get("q") || "") };
+    const hit = await findLearned(url.searchParams.get("q") || "");
+    return { hit: hit ? { answer: hit.answer } : null };
   }
 
   if (path === "/api/desk/push-key" && method === "GET") {
@@ -134,12 +136,24 @@ export default defineHandler(async (event) => {
       role: "staff",
       zh,
     });
-    if (thread) {
-      const lastVisitor = [...thread.messages].reverse().find((m) => m.role === "visitor");
-      if (lastVisitor) await learn({ question: lastVisitor.text, answer: english, zh });
-    }
     if (!thread) event.res.status = 404;
-    return { thread, learned: true };
+    return { thread, learned: false };
+  }
+  if (path === "/api/desk/learn" && method === "POST") {
+    const body = await event.req.json().catch(() => ({}));
+    const item = await learn({
+      question: String(body.question || "").slice(0, 500),
+      answer: String(body.answer || "").slice(0, 1000),
+      zh: String(body.zh || "").slice(0, 1000),
+    });
+    if (!item) event.res.status = 400;
+    return { item, published: false };
+  }
+  if (path === "/api/desk/publish" && method === "POST") {
+    const body = await event.req.json().catch(() => ({}));
+    const item = await publishLearned(String(body.id || ""));
+    if (!item) event.res.status = 404;
+    return { item, published: true };
   }
   if (path === "/api/desk/status" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));

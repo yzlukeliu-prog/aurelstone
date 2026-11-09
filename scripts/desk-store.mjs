@@ -160,15 +160,28 @@ function tokens(text) {
     .filter((w) => w.length > 2);
 }
 
+function redact(text) {
+  return String(text || "")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/(?:\+?61|0)[\d\s()-]{8,}/g, "[phone]")
+    .replace(/\b\d{6,}\b/g, "[number]")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export async function learn({ question, answer, zh }) {
-  if (!question || !answer) return null;
+  const cleanQuestion = redact(question);
+  const cleanAnswer = redact(answer);
+  const cleanZh = redact(zh);
+  if (!cleanQuestion || !cleanAnswer) return null;
   return update((data) => {
     data.learned = data.learned || [];
     const item = {
       id: id(),
-      question,
-      answer,
-      zh: zh || "",
+      question: cleanQuestion,
+      answer: cleanAnswer,
+      zh: cleanZh,
+      published: false,
       at: new Date().toISOString(),
     };
     data.learned.unshift(item);
@@ -177,9 +190,21 @@ export async function learn({ question, answer, zh }) {
   });
 }
 
+export async function publishLearned(itemId) {
+  return update((data) => {
+    const item = (data.learned || []).find((entry) => entry.id === itemId);
+    if (!item) return null;
+    item.question = redact(item.question);
+    item.answer = redact(item.answer);
+    item.zh = redact(item.zh);
+    item.published = true;
+    return item;
+  });
+}
+
 export async function findLearned(question) {
   const { data } = await load();
-  const learned = data.learned || [];
+  const learned = (data.learned || []).filter((item) => item.published === true);
   const q = new Set(tokens(question));
   if (!q.size) return null;
   let best = null;
@@ -194,12 +219,15 @@ export async function findLearned(question) {
       bestScore = score;
     }
   }
-  return bestScore >= 0.34 ? best : null;
+  return bestScore >= 0.34 ? { answer: redact(best.answer) } : null;
 }
 
 export async function listLearned() {
   const { data } = await load();
-  return data.learned || [];
+  return (data.learned || []).map((item) => ({
+    ...item,
+    published: item.published === true,
+  }));
 }
 
 export async function listSubscriptions() {
