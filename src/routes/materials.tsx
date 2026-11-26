@@ -41,10 +41,32 @@ const kindFilters: { id: "all" | MaterialKind; label: string }[] = [
   { id: "fencing", label: "Fencing" },
 ];
 
+const kindByRealm: Record<"all" | MaterialRealm, ("all" | MaterialKind)[]> = {
+  all: [
+    "all",
+    "joinery",
+    "floor",
+    "wall-panel",
+    "wall-protection",
+    "decking",
+    "fencing",
+  ],
+  indoor: ["all", "joinery", "floor", "wall-panel", "wall-protection"],
+  outdoor: ["all", "decking", "fencing"],
+};
+
 function MaterialsPage() {
   const [realm, setRealm] = useState<"all" | MaterialRealm>("all");
   const [kind, setKind] = useState<"all" | MaterialKind>("all");
   const [selected, setSelected] = useState<string[]>([]);
+
+  const availableKinds = kindByRealm[realm];
+  const kindOptions = kindFilters.filter((f) => availableKinds.includes(f.id));
+
+  function chooseRealm(next: "all" | MaterialRealm) {
+    setRealm(next);
+    if (!kindByRealm[next].includes(kind)) setKind("all");
+  }
 
   const visible = useMemo(
     () =>
@@ -81,7 +103,7 @@ function MaterialsPage() {
             <button
               key={f.id}
               type="button"
-              onClick={() => setRealm(f.id)}
+              onClick={() => chooseRealm(f.id)}
               className={cn(
                 "h-11 rounded-full px-4 text-sm transition-colors duration-150",
                 realm === f.id
@@ -94,7 +116,7 @@ function MaterialsPage() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          {kindFilters.map((f) => (
+          {kindOptions.map((f) => (
             <button
               key={f.id}
               type="button"
@@ -111,6 +133,12 @@ function MaterialsPage() {
           ))}
         </div>
       </div>
+
+      {visible.length === 0 ? (
+        <p className="mt-10 text-sm text-muted">
+          Nothing in this combination. Choose another type.
+        </p>
+      ) : null}
 
       <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
         {visible.map((m) => {
