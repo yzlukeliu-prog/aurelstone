@@ -9,8 +9,6 @@ const hours = site.showroom.hours
   .map((h) => `${h.days} ${h.time}`)
   .join("; ");
 
-const address = `${site.showroom.street}, ${site.showroom.suburb} ${site.showroom.state} ${site.showroom.postcode}`;
-
 function has(q: string, words: string[]) {
   return words.some((w) => q.includes(w));
 }
@@ -28,14 +26,14 @@ export function answerFromSite(raw: string): DeskReply {
   if (has(q, ["hour", "open", "close", "when", "appointment", "visit", "showroom"])) {
     return {
       handoff: false,
-      text: `The Cremorne showroom is at ${address}. Hours: ${hours}. Sunday and Monday are by appointment. You can book a time on the Enquire page, or call ${site.phone}.`,
+      text: `The showroom is in Cremorne, Melbourne. Hours: ${hours}. Sunday and Monday are by appointment. You can book a time on the Enquire page, or call ${site.phone}.`,
     };
   }
 
   if (has(q, ["where", "address", "location", "cremorne", "melbourne", "parking"])) {
     return {
       handoff: false,
-      text: `We are at ${address}, a short walk from Richmond station. Samples are in the showroom — bring a floor plan if you have one.`,
+      text: `The showroom is in Cremorne, Melbourne. Address is given when a visit is booked. Samples are in the showroom — bring a floor plan if you have one.`,
     };
   }
 

@@ -106,9 +106,7 @@ export function SiteHeader() {
               <Button asChild size="lg">
                 <Link to="/showroom">Book a Cremorne visit</Link>
               </Button>
-              <p className="text-sm text-muted">
-                {site.showroom.street}, {site.showroom.suburb}
-              </p>
+              <p className="text-sm text-muted">Cremorne, Melbourne</p>
             </div>
           </nav>
         </div>

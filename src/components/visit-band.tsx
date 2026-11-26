@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Container } from "@/components/site-shell";
-import { site } from "@/lib/site";
 
 export function VisitBand() {
   return (
@@ -13,8 +12,7 @@ export function VisitBand() {
             Sit with the samples. Take what you need home.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-stone">
-            {site.showroom.street}, {site.showroom.suburb}. Tuesday to Saturday,
-            or by appointment.
+            Cremorne. Tuesday to Saturday, or by appointment.
           </p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">

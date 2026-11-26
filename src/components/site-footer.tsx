@@ -18,9 +18,7 @@ export function SiteFooter() {
         <div>
           <p className="text-sm font-medium text-fg">Visit</p>
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            {site.showroom.street}
-            <br />
-            {site.showroom.suburb} {site.showroom.state} {site.showroom.postcode}
+            {site.showroom.suburb}
             <br />
             {site.phone}
             <br />

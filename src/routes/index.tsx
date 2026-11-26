@@ -38,10 +38,8 @@ function Home() {
     email: site.email,
     address: {
       "@type": "PostalAddress",
-      streetAddress: site.showroom.street,
-      addressLocality: site.showroom.suburb,
-      addressRegion: site.showroom.state,
-      postalCode: site.showroom.postcode,
+      addressLocality: "Cremorne",
+      addressRegion: "VIC",
       addressCountry: "AU",
     },
     areaServed: "Melbourne",

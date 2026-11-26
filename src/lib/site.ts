@@ -6,15 +6,14 @@ export const site = {
   phone: "0405 527 839",
   phoneHref: "tel:+61405527839",
   email: "hello@aurelstone.com.au",
-  mapsUrl: "https://maps.google.com/?q=14+Cubitt+Street+Cremorne+VIC+3121",
-  mapsEmbed:
-    "https://maps.google.com/maps?q=14%20Cubitt%20Street%20Cremorne%20VIC%203121&z=16&output=embed",
+  mapsUrl: "",
+  mapsEmbed: "",
   showroom: {
     name: "Cremorne Showroom",
-    street: "14 Cubitt Street",
+    street: "",
     suburb: "Cremorne",
     state: "VIC",
-    postcode: "3121",
+    postcode: "",
     hours: [
       { days: "Tuesday–Friday", time: "10:00–16:00" },
       { days: "Saturday", time: "10:00–15:00" },
@@ -745,7 +744,7 @@ export const processSteps = [
   {
     n: "01",
     title: "Visit the showroom",
-    body: "Come to Cubitt Street. Sit with the samples in daylight, take boards home, and talk through the rooms you are actually building.",
+    body: "Sit with the samples in daylight, take boards home, and talk through the rooms you are actually building.",
   },
   {
     n: "02",

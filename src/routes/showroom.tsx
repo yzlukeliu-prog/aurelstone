@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { Clock, Mail, Phone } from "lucide-react";
 import { VisitForm } from "@/components/enquiry-forms";
 import { Container, Frame, PageIntro } from "@/components/site-shell";
 import { site } from "@/lib/site";
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/showroom")({
       {
         name: "description",
         content:
-          "Visit Aurelstone at 14 Cubitt Street, Cremorne. Book a Melbourne showroom appointment for joinery, SPC, and WPC samples.",
+          "Book a Melbourne showroom appointment for joinery, SPC, and WPC samples.",
       },
     ],
   }),
@@ -35,28 +35,12 @@ function ShowroomPage() {
         <div className="md:col-span-5">
           <PageIntro kicker="Cremorne" title="The showroom.">
             <p>
-              A converted warehouse floor on Cubitt Street. Full kitchens, wall
-              bays, floor lengths, and an outdoor deck you can stand on.
-              Parking is on the street; we are a short walk from Richmond
-              Station.
+              Full kitchens, wall bays, floor lengths, and an outdoor deck you
+              can stand on. The address is given when a visit is booked.
             </p>
           </PageIntro>
 
           <ul className="mt-10 space-y-5 text-sm">
-            <li className="flex gap-3">
-              <MapPin className="mt-0.5 size-4 shrink-0 text-muted" />
-              <span>
-                <a
-                  href={site.mapsUrl}
-                  className="text-fg underline-offset-4 hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {site.showroom.street}, {site.showroom.suburb}{" "}
-                  {site.showroom.state} {site.showroom.postcode}
-                </a>
-              </span>
-            </li>
             <li className="flex gap-3">
               <Clock className="mt-0.5 size-4 shrink-0 text-muted" />
               <span className="text-muted">
@@ -80,15 +64,6 @@ function ShowroomPage() {
               </a>
             </li>
           </ul>
-
-          <a
-            href={site.mapsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-8 inline-flex h-11 items-center rounded-md bg-surface px-4 text-sm text-fg shadow-border transition-colors duration-150 hover:bg-bg-elevated"
-          >
-            Open in Google Maps
-          </a>
         </div>
 
         <div
