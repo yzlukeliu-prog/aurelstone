@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 
 function Mark({ className }: { className?: string }) {
   return (
-    <span
-      className={cn("inline-block size-5 shrink-0 bg-accent", className)}
+    <svg
+      viewBox="0 0 32 24"
+      className={cn("h-4 w-5 shrink-0 text-fg", className)}
       aria-hidden
     >
-      <span className="block size-full scale-50 bg-stone" />
-    </span>
+      <path d="M1 19h18l2-4H3z" fill="currentColor" />
+      <path d="M4 13h18l2-4H6z" fill="currentColor" />
+      <path d="M7 7h18l2-4H9z" fill="currentColor" />
+    </svg>
   );
 }
 

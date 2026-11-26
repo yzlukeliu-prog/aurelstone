@@ -3,8 +3,8 @@ export const site = {
   tagline: "Surfaces for the whole home.",
   description:
     "A Melbourne showroom for custom joinery, SPC walls and floors, wall protection, and outdoor WPC living — specified together so the house reads as one.",
-  phone: "03 9429 0188",
-  phoneHref: "tel:+61394290188",
+  phone: "0405 527 839",
+  phoneHref: "tel:+61405527839",
   email: "hello@aurelstone.com.au",
   mapsUrl: "https://maps.google.com/?q=14+Cubitt+Street+Cremorne+VIC+3121",
   mapsEmbed:
@@ -24,13 +24,9 @@ export const site = {
 } as const;
 
 export const nav = [
-  { to: "/indoor", label: "Indoor" },
-  { to: "/outdoor", label: "Outdoor" },
-  { to: "/projects", label: "Projects" },
   { to: "/materials", label: "Materials" },
-  { to: "/styles", label: "Styles" },
+  { to: "/projects", label: "Projects" },
   { to: "/showroom", label: "Showroom" },
-  { to: "/process", label: "Process" },
 ] as const;
 
 export const visitTimes = ["10:00", "11:00", "12:30", "14:00", "15:00"] as const;

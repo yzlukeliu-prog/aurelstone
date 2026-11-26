@@ -21,7 +21,7 @@ export function answerFromSite(raw: string): DeskReply {
   if (has(q, ["person", "human", "someone", "staff", "call me", "speak to", "talk to"])) {
     return {
       handoff: true,
-      text: "I'll leave this with the showroom. Someone from Aurelstone will reply here, or you can call 03 9429 0188.",
+      text: "I'll leave this with the showroom. Someone from Aurelstone will reply here, or you can call 0405 527 839.",
     };
   }
 
@@ -97,6 +97,6 @@ export function answerFromSite(raw: string): DeskReply {
 
   return {
     handoff: true,
-    text: "I don't have a sure answer for that from the showroom notes. I've marked it for a person at Aurelstone — or call 03 9429 0188, or send the details on the Enquire page.",
+    text: "I don't have a sure answer for that from the showroom notes. I've marked it for a person at Aurelstone — or call 0405 527 839, or send the details on the Enquire page.",
   };
 }

@@ -53,17 +53,6 @@ function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <section className="bg-paper py-10 md:py-14">
-        <Container>
-          <figure>
-            <img
-              src="/images/sofa-wall-a-kept.jpg"
-              alt=""
-              className="w-full"
-            />
-          </figure>
-        </Container>
-      </section>
       <section className="relative min-h-[88vh] bg-hero text-hero-fg">
         <Frame
           src="/images/hero.jpg"
