@@ -282,6 +282,8 @@ export async function clearDesk() {
     return { threads: 0, learned: 0, subscriptions: (data.subscriptions || []).length };
   });
 }
+
+export async function listSubscriptions() {
   const { data } = await load();
   return data.subscriptions || [];
 }
