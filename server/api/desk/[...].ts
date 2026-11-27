@@ -109,9 +109,11 @@ export default defineHandler(async (event) => {
       event.res.status = saved.error === "forbidden" ? 403 : 404;
       return { error: saved.error };
     }
+    const latest = await getThread(saved.thread.id);
     const staffTookOver =
-      saved.thread.status === "staff" ||
-      (saved.thread.messages || []).some((m) => m.role === "staff");
+      latest?.human === true ||
+      latest?.status === "staff" ||
+      (latest?.messages || saved.thread.messages || []).some((m) => m.role === "staff");
     if (!staffTookOver) {
       const learned = await findLearned(text);
       const reply = learned?.answer

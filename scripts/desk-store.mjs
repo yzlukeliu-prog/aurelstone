@@ -159,6 +159,7 @@ export async function postReply({ threadId, text, role, zh }) {
     const now = new Date().toISOString();
     thread.updatedAt = now;
     thread.status = role === "staff" ? "staff" : thread.status;
+    if (role === "staff") thread.human = true;
     thread.messages.push({ id: id(), role, text, zh: zh || "", at: now });
     return withoutSecret(thread);
   });
