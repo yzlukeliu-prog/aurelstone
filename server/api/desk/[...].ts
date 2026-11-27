@@ -21,6 +21,22 @@ import {
 } from "../../../scripts/desk-store.mjs";
 import { toChinese, toEnglish, hasChinese } from "../../../scripts/translate.mjs";
 
+const ALLOWED_ORIGINS = new Set([
+  "https://aurelstone.com.au",
+  "https://www.aurelstone.com.au",
+]);
+
+function allowCors(event) {
+  const origin = event.req.headers.get("origin") || "";
+  if (!ALLOWED_ORIGINS.has(origin)) return false;
+  event.res.headers.set("Access-Control-Allow-Origin", origin);
+  event.res.headers.set("Vary", "Origin");
+  event.res.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  event.res.headers.set("Access-Control-Allow-Headers", "content-type, x-desk-key");
+  event.res.headers.set("Access-Control-Max-Age", "86400");
+  return true;
+}
+
 function staffKey() {
   const key = process.env.DESK_KEY || "";
   if (!key || key === "aurelstone") return "";
@@ -63,9 +79,15 @@ async function notifyPhones(thread, text) {
 }
 
 export default defineHandler(async (event) => {
+  const corsOk = allowCors(event);
   const url = new URL(event.req.url);
   const path = url.pathname;
   const method = event.req.method.toUpperCase();
+
+  if (method === "OPTIONS") {
+    event.res.status = corsOk ? 204 : 403;
+    return { ok: corsOk };
+  }
 
   if (path === "/api/desk/message" && method === "POST") {
     const body = await event.req.json().catch(() => ({}));
