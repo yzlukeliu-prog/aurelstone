@@ -109,17 +109,24 @@ export default defineHandler(async (event) => {
       event.res.status = saved.error === "forbidden" ? 403 : 404;
       return { error: saved.error };
     }
-    const learned = await findLearned(text);
-    const reply = learned?.answer
-      ? { text: learned.answer, handoff: false }
-      : answerFromSite(text);
-    await postReply({
-      threadId: saved.thread.id,
-      text: reply.text,
-      role: "assistant",
-      zh: "",
-    });
-    if (reply.handoff) await setStatus(saved.thread.id, "waiting");
+    const staffTookOver =
+      saved.thread.status === "staff" ||
+      (saved.thread.messages || []).some((m) => m.role === "staff");
+    if (!staffTookOver) {
+      const learned = await findLearned(text);
+      const reply = learned?.answer
+        ? { text: learned.answer, handoff: false }
+        : answerFromSite(text);
+      await postReply({
+        threadId: saved.thread.id,
+        text: reply.text,
+        role: "assistant",
+        zh: "",
+      });
+      if (reply.handoff) await setStatus(saved.thread.id, "waiting");
+    } else {
+      await setStatus(saved.thread.id, "waiting");
+    }
     void notifyPhones(saved.thread, text);
     const thread = await getOwnedThread(saved.thread.id, saved.token);
     return { thread, token: saved.token };
