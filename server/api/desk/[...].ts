@@ -18,6 +18,7 @@ import {
   setStatus,
   unpublishLearned,
   updateLearned,
+  clearDesk,
 } from "../../../scripts/desk-store.mjs";
 import { toChinese, toEnglish, hasChinese } from "../../../scripts/translate.mjs";
 
@@ -177,6 +178,9 @@ export default defineHandler(async (event) => {
   if (!staff) {
     event.res.status = 401;
     return { error: "unauthorised" };
+  }
+  if (path === "/api/desk/clear" && method === "POST") {
+    return await clearDesk();
   }
   if (path === "/api/desk/threads" && method === "GET") {
     return { threads: await listThreads(), learned: await listLearned() };

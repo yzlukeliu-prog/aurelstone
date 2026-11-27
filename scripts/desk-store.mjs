@@ -275,7 +275,13 @@ export async function listLearned() {
   }));
 }
 
-export async function listSubscriptions() {
+export async function clearDesk() {
+  return update((data) => {
+    data.threads = [];
+    data.learned = [];
+    return { threads: 0, learned: 0, subscriptions: (data.subscriptions || []).length };
+  });
+}
   const { data } = await load();
   return data.subscriptions || [];
 }
