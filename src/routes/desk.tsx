@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Container } from "@/components/site-shell";
 
 function chime() {
   const ctx = new AudioContext();
@@ -22,6 +21,7 @@ export const Route = createFileRoute("/desk")({
     meta: [
       { title: "Desk — Aurelstone" },
       { name: "robots", content: "noindex" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Desk" },
@@ -70,6 +70,8 @@ function DeskPage() {
   const [error, setError] = useState("");
   const [edits, setEdits] = useState<Record<string, { question: string; answer: string }>>({});
   const [notice, setNotice] = useState("");
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const end = useRef<HTMLDivElement>(null);
   const seen = useRef<Set<string>>(new Set());
   const primed = useRef(false);
   const lastMsg = useRef<Map<string, string>>(new Map());
@@ -134,7 +136,7 @@ function DeskPage() {
       primed.current = true;
       setThreads(data.threads);
       setLearned(data.learned || []);
-      setActive((id) => id || data.threads[0]?.id || null);
+      setActive((id) => id);
     };
     void load();
     const timer = window.setInterval(load, 4000);
@@ -142,6 +144,10 @@ function DeskPage() {
   }, [ready, key]);
 
   const current = threads.find((t) => t.id === active);
+
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [current?.messages.length, active]);
 
   async function reply() {
     if (!current || !text.trim()) return;
@@ -162,9 +168,10 @@ function DeskPage() {
 
   if (!ready) {
     return (
-      <Container className="max-w-md py-20">
-        <h1 className="font-display text-4xl">Showroom desk</h1>
-        <p className="mt-3 text-sm text-muted">Staff only. Visitors never see this page.</p>
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
+        <p className="text-xs tracking-[0.2em] text-muted">AURELSTONE</p>
+        <h1 className="mt-2 font-display text-4xl">Desk</h1>
+        <p className="mt-3 text-sm text-muted">员工客服客户端。客人看不到这个页面。</p>
         <form
           className="mt-8 flex gap-2"
           onSubmit={(e) => {
@@ -177,174 +184,178 @@ function DeskPage() {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             type="password"
-            placeholder="Desk key"
-            className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            placeholder="密码"
+            className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-3 text-base outline-none"
           />
-          <button className="rounded-md bg-accent px-4 text-sm text-accent-fg">Enter</button>
+          <button className="rounded-full bg-accent px-5 text-sm text-accent-fg">进入</button>
         </form>
         {error ? <p className="mt-3 text-sm">{error}</p> : null}
-      </Container>
+      </div>
     );
   }
 
   return (
-    <Container className="grid gap-8 py-10 md:grid-cols-12">
-      <aside className="md:col-span-4">
-        <h1 className="font-display text-3xl">Desk</h1>
-        <p className="mt-2 text-sm text-muted">客人英文下面是中文。你用中文回复，客人看到英文。样品、预约、询价也会出现在这里，有新单会响一声。</p>
-        <button
-          type="button"
-          className="mt-3 text-sm underline"
-          onClick={async () => {
-            const permission = await Notification.requestPermission();
-            try { chime(); } catch { /* ignore */ }
-            if (permission !== "granted" || !("serviceWorker" in navigator)) return;
-            const reg = await navigator.serviceWorker.register("/desk-sw.js");
-            const keyRes = await fetch("/api/desk/push-key");
-            const { key: publicKey } = await keyRes.json();
-            if (!publicKey) return;
-            const sub = await reg.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: publicKey,
-            });
-            const saved = await fetch("/api/desk/subscribe", {
-              method: "POST",
-              headers: { "content-type": "application/json", "x-desk-key": key },
-              body: JSON.stringify({ subscription: sub.toJSON() }),
-            });
-            const result = (await saved.json().catch(() => ({}))) as { ok?: boolean };
-            if (!saved.ok || !result.ok) {
-              setNotice("手机通知没有开启，请再试一次。");
-              return;
-            }
-            setNotice("手机通知已开启。即使关掉客服台，也会收到弹窗。");
-          }}
-        >
-          开启手机通知
-        </button>
-        {notice ? <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm">{notice}</p> : null}
-        <p className="mt-2 text-xs text-muted">
-          问答草稿 {learned.filter((item) => !item.published).length} 条，已公开 {learned.filter((item) => item.published).length} 条。回复不会自动公开。
-        </p>
-        <ul className="mt-3 space-y-3">
-          {learned.map((item) => (
-            <li key={item.id} className="rounded-lg bg-surface px-3 py-3 text-xs">
-              <p className="text-muted">{item.published ? "已公开" : "草稿"}</p>
-              <label className="mt-2 block text-muted">将公开的问题</label>
-              <textarea
-                value={edits[item.id]?.question ?? item.question}
-                className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-1"
-                onChange={(e) => {
-                  setEdits((prev) => ({
-                    ...prev,
-                    [item.id]: {
-                      question: e.target.value,
-                      answer: prev[item.id]?.answer ?? item.answer,
-                    },
-                  }));
-                }}
-              />
-              <label className="mt-2 block text-muted">将公开的答案</label>
-              <textarea
-                value={edits[item.id]?.answer ?? item.answer}
-                className="mt-1 w-full rounded-md border border-border bg-bg px-2 py-1"
-                onChange={(e) => {
-                  setEdits((prev) => ({
-                    ...prev,
-                    [item.id]: {
-                      question: prev[item.id]?.question ?? item.question,
-                      answer: e.target.value,
-                    },
-                  }));
-                }}
-              />
-              <div className="mt-2 flex gap-3">
-                <button
-                  type="button"
-                  className="underline"
-                  onClick={async () => {
-                    const question = edits[item.id]?.question ?? item.question;
-                    const answer = edits[item.id]?.answer ?? item.answer;
-                    const res = await fetch("/api/desk/publish", {
-                      method: "POST",
-                      headers: { "content-type": "application/json", "x-desk-key": key },
-                      body: JSON.stringify({ id: item.id, question, answer }),
-                    });
-                    if (!res.ok) {
-                      setNotice("公开失败，没有发出去。");
-                      return;
-                    }
-                    setNotice("已按上面的文字公开。电话、邮箱和长数字会先被去掉。");
+    <div className="mx-auto flex h-dvh w-full max-w-6xl min-w-0 overflow-hidden bg-bg md:grid md:grid-cols-12">
+      <aside className={`${current ? "hidden" : "flex"} min-w-0 flex-col md:col-span-4 md:flex md:border-r md:border-border`}>
+        <div className="px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="flex items-center justify-between">
+            <h1 className="font-display text-3xl">Desk</h1>
+            <button type="button" className="text-xs underline" onClick={() => setDraftsOpen((v) => !v)}>
+              问答 {learned.length}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-muted">客人英文下面是中文。你用中文回，客人看到英文。</p>
+          <button
+            type="button"
+            className="mt-3 text-sm underline"
+            onClick={async () => {
+              const permission = await Notification.requestPermission();
+              try { chime(); } catch { /* ignore */ }
+              if (permission !== "granted" || !("serviceWorker" in navigator)) return;
+              const reg = await navigator.serviceWorker.register("/desk-sw.js");
+              const keyRes = await fetch("/api/desk/push-key");
+              const { key: publicKey } = await keyRes.json();
+              if (!publicKey) return;
+              const sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: publicKey,
+              });
+              const saved = await fetch("/api/desk/subscribe", {
+                method: "POST",
+                headers: { "content-type": "application/json", "x-desk-key": key },
+                body: JSON.stringify({ subscription: sub.toJSON() }),
+              });
+              const result = (await saved.json().catch(() => ({}))) as { ok?: boolean };
+              if (!saved.ok || !result.ok) {
+                setNotice("手机通知没有开启，请再试一次。");
+                return;
+              }
+              setNotice("手机通知已开启。");
+            }}
+          >
+            开启手机通知
+          </button>
+          {notice ? <p className="mt-3 rounded-lg bg-surface px-3 py-2 text-sm">{notice}</p> : null}
+        </div>
+        {draftsOpen ? (
+          <ul className="max-h-64 space-y-3 overflow-y-auto px-4 pb-4">
+            {learned.map((item) => (
+              <li key={item.id} className="rounded-lg bg-surface px-3 py-3 text-xs">
+                <p className="text-muted">{item.published ? "已公开" : "草稿"}</p>
+                <textarea
+                  value={edits[item.id]?.question ?? item.question}
+                  className="mt-2 w-full rounded-md border border-border bg-bg px-2 py-1"
+                  onChange={(e) => {
+                    setEdits((prev) => ({
+                      ...prev,
+                      [item.id]: { question: e.target.value, answer: prev[item.id]?.answer ?? item.answer },
+                    }));
                   }}
-                >
-                  确认公开
-                </button>
-                {item.published ? (
+                />
+                <textarea
+                  value={edits[item.id]?.answer ?? item.answer}
+                  className="mt-2 w-full rounded-md border border-border bg-bg px-2 py-1"
+                  onChange={(e) => {
+                    setEdits((prev) => ({
+                      ...prev,
+                      [item.id]: { question: prev[item.id]?.question ?? item.question, answer: e.target.value },
+                    }));
+                  }}
+                />
+                <div className="mt-2 flex gap-3">
                   <button
                     type="button"
                     className="underline"
                     onClick={async () => {
-                      const res = await fetch("/api/desk/unpublish", {
+                      const question = edits[item.id]?.question ?? item.question;
+                      const answer = edits[item.id]?.answer ?? item.answer;
+                      const res = await fetch("/api/desk/publish", {
                         method: "POST",
                         headers: { "content-type": "application/json", "x-desk-key": key },
-                        body: JSON.stringify({ id: item.id }),
+                        body: JSON.stringify({ id: item.id, question, answer }),
                       });
-                      setNotice(res.ok ? "已撤回，公开接口不再返回。" : "撤回失败。");
+                      setNotice(res.ok ? "已公开。" : "公开失败。");
                     }}
                   >
-                    撤回
+                    确认公开
                   </button>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-        <ul className="mt-6 space-y-2">
-          {threads.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => setActive(t.id)}
-                className="w-full rounded-lg bg-surface px-3 py-3 text-left text-sm"
-              >
-                <span className="block">{t.name}</span>
-                <span className="block truncate text-xs text-muted">
-                  {t.messages[t.messages.length - 1]?.zh || t.messages[t.messages.length - 1]?.text || t.status}
-                </span>
-              </button>
-            </li>
-          ))}
-          {threads.length === 0 ? <li className="text-sm text-muted">No conversations yet.</li> : null}
+                  {item.published ? (
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={async () => {
+                        const res = await fetch("/api/desk/unpublish", {
+                          method: "POST",
+                          headers: { "content-type": "application/json", "x-desk-key": key },
+                          body: JSON.stringify({ id: item.id }),
+                        });
+                        setNotice(res.ok ? "已撤回。" : "撤回失败。");
+                      }}
+                    >
+                      撤回
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-6">
+          {threads.map((t) => {
+            const last = t.messages[t.messages.length - 1];
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => setActive(t.id)}
+                  className={`w-full min-w-0 rounded-xl px-3 py-3 text-left ${active === t.id ? "bg-surface" : ""}`}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm">{t.name}</span>
+                    <span className="shrink-0 text-[11px] text-muted">{t.status === "waiting" ? "待回复" : ""}</span>
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-muted">
+                    {last?.zh || last?.text || "新对话"}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {threads.length === 0 ? <li className="px-2 py-6 text-sm text-muted">还没有客人消息。</li> : null}
         </ul>
       </aside>
-      <section className="md:col-span-8">
+      <section className={`${current ? "flex" : "hidden"} min-w-0 flex-col md:col-span-8 md:flex`}>
         {current ? (
-          <div className="flex min-h-[28rem] flex-col rounded-xl bg-surface p-4">
-            <div className="flex-1 space-y-3 overflow-y-auto">
-              {current.messages.map((m) => (
-                <div key={m.id} className="rounded-lg bg-bg px-3 py-3 text-sm">
-                  <span className="mb-2 block text-xs text-muted">
-                    {m.role === "visitor" ? "客人" : m.role === "staff" ? "你" : "助手"}
-                  </span>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div>
-                      <p className="text-xs text-muted">原文</p>
-                      <p className="mt-1">{m.role === "staff" && m.zh ? m.zh : m.text}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted">
-                        {m.role === "staff" ? "发给客人的英文" : "中文"}
+          <>
+            <div className="flex items-center gap-3 border-b border-border px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <button type="button" className="text-sm md:hidden" onClick={() => setActive(null)}>返回</button>
+              <div className="min-w-0">
+                <p className="truncate text-sm">{current.name}</p>
+                <p className="text-[11px] text-muted">{current.status === "waiting" ? "待回复" : "对话中"}</p>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-4">
+              {current.messages.map((m) => {
+                const mine = m.role === "staff";
+                const assistant = m.role === "assistant";
+                return (
+                  <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] min-w-0 break-words rounded-2xl px-3 py-2 text-sm ${mine ? "bg-accent text-accent-fg" : assistant ? "bg-bg-elevated" : "bg-surface"}`}>
+                      <p className={`text-[11px] ${mine ? "text-accent-fg/70" : "text-muted"}`}>
+                        {mine ? "你" : assistant ? "助手" : "客人"}
                       </p>
-                      <p className="mt-1 text-muted">
-                        {m.role === "staff" ? m.text : m.zh || "翻译未返回"}
+                      <p className="mt-1 whitespace-pre-wrap break-words">{mine && m.zh ? m.zh : m.text}</p>
+                      <p className={`mt-1 whitespace-pre-wrap break-words text-xs ${mine ? "text-accent-fg/70" : "text-muted"}`}>
+                        {mine ? m.text : m.zh || "翻译未返回"}
                       </p>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+              <div ref={end} />
             </div>
             <form
-              className="mt-4 flex gap-2"
+              className="flex gap-2 border-t border-border px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3"
               onSubmit={(e) => {
                 e.preventDefault();
                 void reply();
@@ -353,16 +364,16 @@ function DeskPage() {
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Reply as Aurelstone"
-                className="flex-1 rounded-md border border-border bg-bg px-3 py-2 text-sm"
+                placeholder="用中文回复"
+                className="min-w-0 flex-1 rounded-full border border-border bg-surface px-4 py-3 text-base outline-none"
               />
-              <button className="rounded-md bg-accent px-4 text-sm text-accent-fg">Send</button>
+              <button className="rounded-full bg-accent px-5 text-sm text-accent-fg">发送</button>
             </form>
-          </div>
+          </>
         ) : (
-          <p className="text-sm text-muted">Select a conversation.</p>
+          <div className="hidden flex-1 items-center justify-center text-sm text-muted md:flex">选择一个对话</div>
         )}
       </section>
-    </Container>
+    </div>
   );
 }

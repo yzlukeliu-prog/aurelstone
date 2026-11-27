@@ -1,10 +1,11 @@
 {
   "name": "Aurelstone Desk",
   "short_name": "Desk",
-  "description": "Aurelstone showroom desk",
+  "description": "Aurelstone staff chat client",
   "start_url": "/desk",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f4efe8",
   "theme_color": "#1c1917",
   "icons": [

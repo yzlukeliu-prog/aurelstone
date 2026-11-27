@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { cn } from "@/lib/utils";
 import { ChatWidget } from "@/components/chat-widget";
 
 export function SiteShell({ children }: { children: ReactNode }) {
+  const path = useRouterState({ select: (state) => state.location.pathname });
+  const desk = path === "/desk" || path.startsWith("/desk/");
   return (
     <div className="flex min-h-dvh flex-col">
       <a
@@ -13,12 +16,12 @@ export function SiteShell({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <SiteHeader />
-      <main id="content" className="flex-1">
+      {desk ? null : <SiteHeader />}
+      <main id="content" className="min-w-0 flex-1">
         {children}
       </main>
-      <SiteFooter />
-      <ChatWidget />
+      {desk ? null : <SiteFooter />}
+      {desk ? null : <ChatWidget />}
     </div>
   );
 }
